@@ -6,7 +6,7 @@ import zipfile
 # App flow:
 # - Get an mscz or mscx
 # - Read the XML
-# - If it has parts already (multiple score nodes, the following score nodes have a <metaTag name="partname" ... node):
+# - If it has parts already
 #   - All good
 # - If not:
 #   - Split the XML into the associated parts
@@ -29,9 +29,20 @@ class Score:
         self._xml_tree = xml_tree
 
     def has_manual_parts(self):
-        pass
+        sub_score_nodes = self._xml_tree.findall('Score/Score')
+        if len(sub_score_nodes) == 0:
+            return False
+
+        for sub_score_node in sub_score_nodes:
+            if len(sub_score_node.findall('metaTag/[@name="partName"]')) != 1:
+                raise ValueError('Found child score nodes, but no part name nodes')
+
+        return True
 
     def split_to_part_scores(self):
+        if self.has_manual_parts():
+            raise ValueError('Not splitting part scores for score with manual parts')
+
         return [Score(copy.deepcopy(self._xml_tree))]
 
     def write_mscx_to_file(self, f):
