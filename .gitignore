@@ -1,0 +1,13 @@
+# Application Files
+*.db
+*.log
+
+# Dev Directories
+__pycache__/
+venv/
+.idea/
+
+# PyInstaller Output
+*.spec
+build/
+dist/
