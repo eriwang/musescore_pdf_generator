@@ -4,7 +4,7 @@ import os
 import xml.etree.ElementTree as ET
 import zipfile
 
-from utils.xml_utils import find_exactly_one
+from utils.xml_utils import find_exactly_one, create_node_with_text
 
 # App flow:
 # - Get an mscz or mscx
@@ -27,9 +27,15 @@ from utils.xml_utils import find_exactly_one
 #           - If PDF page count > min PDF page count, then final PDF is the previous one.
 #   - If not, just convert with the parts and you're done
 
-
+# I discovered shortly after implementing this that the MuseScore CLI can auto-generate parts when generating PDFs (but
+# not mscz or mscx interestingly) if scores do not already have them. To do this, use the "-P" (--export-score-parts)
+# flag with either -o (regular conversion) or -j (batch conversion, seems like you must specify a "score" pdf as well as
+# the "parts" pdfs). However, I also want to manipulate the layout on the individual parts programatically, which is
+# currently unsupported by the MuseScore batch conversion (can specify one style file for the whole job, not on a
+# by-part basis). Therefore I'm still doing the manual splitting of MuseScore parts here when needed.
 class Score:
-    def __init__(self, xml_tree):
+    def __init__(self, name, xml_tree):
+        self.name = name
         self._xml_tree = xml_tree
 
     def has_manual_parts(self):
@@ -48,22 +54,22 @@ class Score:
             raise ValueError('Can\'t split part scores for score with manual parts')
 
         if len(self._xml_tree.findall('Score/Part')) == 1:
-            return [Score(copy.deepcopy(self._xml_tree))]
+            return [Score(None, copy.deepcopy(self._xml_tree))]
 
         parts = _PartScore.create_parts_from_xml(self._xml_tree)
         self._fix_split_part_score_part_names(parts)
 
-        return [Score(p.xml_tree) for p in parts]
+        return [Score(p.get_name(), p.xml_tree) for p in parts]
 
-    def write_mscx_to_file(self, f):
-        ET.ElementTree(self._xml_tree).write(f, encoding='UTF-8')
+    def get_mscx_as_string(self):
+        return ET.tostring(self._xml_tree)
 
     @classmethod
     def create_from_file(cls, filepath):
         _, ext = os.path.splitext(filepath)
 
         if ext == '.mscx':
-            return cls(ET.parse(filepath))
+            return cls(None, ET.parse(filepath).getroot())
         if ext != '.mscz':
             raise ValueError(f'Unsupported filetype for file {filepath}')
 
@@ -71,7 +77,7 @@ class Score:
             path = zipfile.Path(mscz)
             for item in path.iterdir():
                 if item.name.endswith('.mscx'):
-                    return cls(ET.fromstring(item.read_text()))
+                    return cls(None, ET.fromstring(item.read_text()))
 
         raise ValueError(f'No .mscx files found in {filepath}')
 
@@ -91,6 +97,7 @@ class Score:
                 part.set_name(f'{part_name} {part_name_to_correct_part_number[part_name]}')
 
 
+# TODO: remove breaks of any kind?
 class _PartScore:
     def __init__(self, xml_tree):
         self.xml_tree = xml_tree
@@ -113,6 +120,9 @@ class _PartScore:
             # Ordering is important for these method calls, as they depend on each other's results.
             _PartScore._remove_unneeded_parts(part_xml_tree, part_index)
             _PartScore._remove_unneeded_staves_and_staff_vbox(part_xml_tree)
+            # Layout breaks from the score are hopefully unneeded in the part itself, as the measure rendering has
+            # different lines/ pages.
+            _PartScore._remove_layout_breaks(part_xml_tree)
             _PartScore._add_vbox_with_part_text(part_xml_tree, vbox_node)
             _PartScore._fix_staff_ids(part_xml_tree)
 
@@ -150,16 +160,19 @@ class _PartScore:
                 score_staff_node.remove(existing_staff_vbox_node)
 
     @staticmethod
+    def _remove_layout_breaks(xml_tree):
+        for measure_node in xml_tree.findall('Score/Staff/Measure'):
+            layout_break_nodes = measure_node.findall('LayoutBreak')
+            for n in layout_break_nodes:
+                measure_node.remove(n)
+
+    @staticmethod
     def _add_vbox_with_part_text(xml_tree, original_vbox_node):
         vbox_text_node = ET.Element('Text')
-
-        vbox_text_style_node = ET.Element('style')
-        vbox_text_style_node.text = 'Instrument Name (Part)'
-
-        vbox_text_text_node = ET.Element('text')
-        vbox_text_text_node.text = find_exactly_one(xml_tree, 'Score/Part/Instrument/longName').text
-
-        vbox_text_node.extend([vbox_text_style_node, vbox_text_text_node])
+        vbox_text_node.extend([
+            create_node_with_text('style', 'Instrument Name (Part)'),
+            create_node_with_text('text', find_exactly_one(xml_tree, 'Score/Part/Instrument/longName').text)
+        ])
 
         vbox_node = copy.deepcopy(original_vbox_node)
         vbox_node.append(vbox_text_node)
