@@ -43,30 +43,17 @@ class Score:
 
         return True
 
-    def split_to_part_scores(self):
+    def generate_part_scores(self):
         if self.has_manual_parts():
-            raise ValueError('Not splitting part scores for score with manual parts')
+            raise ValueError('Can\'t split part scores for score with manual parts')
 
         if len(self._xml_tree.findall('Score/Part')) == 1:
             return [Score(copy.deepcopy(self._xml_tree))]
 
         parts = _PartScore.create_parts_from_xml(self._xml_tree)
+        self._fix_split_part_score_part_names(parts)
 
-        part_name_to_num_appearances = defaultdict(int)
-        for part_node in self._xml_tree.findall('Score/Part'):
-            part_name_to_num_appearances[find_exactly_one(part_node, 'Instrument/longName').text] += 1
-
-        # Note that this does not handle if there's a "Violin 1", "Violin", and "Violin" part.
-        # It's unclear what should be done (maybe the violin parts should be named "Solo Violin", for example)
-        part_name_to_correct_part_number = defaultdict(int)
-        for part in parts:
-            part_name = part.get_name()
-            is_duplicate_part_name = part_name_to_num_appearances[part_name] > 1
-            if is_duplicate_part_name:
-                part_name_to_correct_part_number[part_name] += 1
-                part.set_name(f'{part_name} {part_name_to_correct_part_number[part_name]}')
-
-        return parts
+        return [Score(p.xml_tree) for p in parts]
 
     def write_mscx_to_file(self, f):
         ET.ElementTree(self._xml_tree).write(f, encoding='UTF-8')
@@ -88,24 +75,31 @@ class Score:
 
         raise ValueError(f'No .mscx files found in {filepath}')
 
+    def _fix_split_part_score_part_names(self, part_scores):
+        part_name_to_num_appearances = defaultdict(int)
+        for part_node in self._xml_tree.findall('Score/Part'):
+            part_name_to_num_appearances[find_exactly_one(part_node, 'Instrument/longName').text] += 1
+
+        # Note that this does not handle if there's a "Violin 1", "Violin", and "Violin" part.
+        # It's unclear what should be done (maybe the violin parts should be named "Solo Violin", for example)
+        part_name_to_correct_part_number = defaultdict(int)
+        for part in part_scores:
+            part_name = part.get_name()
+            is_duplicate_part_name = part_name_to_num_appearances[part_name] > 1
+            if is_duplicate_part_name:
+                part_name_to_correct_part_number[part_name] += 1
+                part.set_name(f'{part_name} {part_name_to_correct_part_number[part_name]}')
+
 
 class _PartScore:
     def __init__(self, xml_tree):
-        self._xml_tree = xml_tree
+        self.xml_tree = xml_tree
 
     def get_name(self):
         return self._get_name_node().text
 
     def set_name(self, name):
         self._get_name_node().text = name
-
-    def _get_name_node(self):
-        vbox_text_nodes = self._xml_tree.findall('Score/Staff/[@id="1"]/VBox/Text')
-        for vbox_text_node in vbox_text_nodes:
-            if find_exactly_one(vbox_text_node, 'style').text == 'Instrument Name (Part)':
-                return find_exactly_one(vbox_text_node, 'text')
-
-        raise ValueError('No vbox part node found')
 
     @classmethod
     def create_parts_from_xml(cls, xml_tree):
@@ -124,6 +118,14 @@ class _PartScore:
             parts.append(cls(part_xml_tree))
 
         return parts
+
+    def _get_name_node(self):
+        vbox_text_nodes = self.xml_tree.findall('Score/Staff/[@id="1"]/VBox/Text')
+        for vbox_text_node in vbox_text_nodes:
+            if find_exactly_one(vbox_text_node, 'style').text == 'Instrument Name (Part)':
+                return find_exactly_one(vbox_text_node, 'text')
+
+        raise ValueError('No vbox part node found')
 
     @staticmethod
     def _remove_unneeded_parts(xml_tree, part_index):

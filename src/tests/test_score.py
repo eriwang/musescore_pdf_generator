@@ -30,7 +30,7 @@ class TestScore(unittest.TestCase):
     def test_split_write_single_part(self):
         _TITLE = 'Single Part'
 
-        parts = self._single_part_score.split_to_part_scores()
+        parts = self._single_part_score.generate_part_scores()
         self.assertEqual(len(parts), 1)
 
         root = _write_score_to_temp_file_and_read_xml(parts[0])
@@ -51,7 +51,7 @@ class TestScore(unittest.TestCase):
     def test_split_write_multi_part_same_name(self):
         # _TITLE = 'Multi Part'
         #
-        # parts = self._multi_part_same_name_score.split_to_part_scores()
+        # parts = self._multi_part_same_name_score.generate_part_scores()
         # print(ET.tostring(parts[1]._xml_tree).decode('UTF-8'))
 
         self.assertEqual(True, False)
@@ -59,14 +59,14 @@ class TestScore(unittest.TestCase):
     def test_split_write_multi_part_multi_staves(self):
         # _TITLE = 'Multi Part with Multi Staves'
         #
-        # parts = self._multi_part_multi_staves_score.split_to_part_scores()
+        # parts = self._multi_part_multi_staves_score.generate_part_scores()
         # print(ET.tostring(parts[1]._xml_tree).decode('UTF-8'))
 
         self.assertEqual(True, False)
 
     def test_split_multi_part_already_assigned_raises(self):
         with self.assertRaises(ValueError):
-            self._multi_part_manual_parts_score.split_to_part_scores()
+            self._multi_part_manual_parts_score.generate_part_scores()
 
     def test_has_manual_parts(self):
         self.assertFalse(self._single_part_score.has_manual_parts())
