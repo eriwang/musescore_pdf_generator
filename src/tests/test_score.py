@@ -3,6 +3,7 @@ import tempfile
 import unittest
 
 from musescore.score import Score
+from utils.xml_utils import find_exactly_one
 
 _SINGLE_PART_PATH = 'test_resources/single_part.mscz'
 _MULTI_PART_SAME_NAME_PATH = 'test_resources/multi_part_same_name.mscz'
@@ -33,29 +34,34 @@ class TestScore(unittest.TestCase):
         self.assertEqual(len(parts), 1)
 
         root = _write_score_to_temp_file_and_read_xml(parts[0])
-        score_node = self._find_exactly_one(root, 'Score')
+        score_node = find_exactly_one(root, 'Score')
         self._assert_nonlinked_score_metadata_is_expected(score_node, _TITLE)
 
-        part_node = self._find_exactly_one(score_node, 'Part')
-        self.assertEqual(self._find_exactly_one(part_node, 'Staff').get('id'), '1')
-        self.assertEqual(self._find_exactly_one(part_node, 'Instrument/longName').text, 'Piano')
+        part_node = find_exactly_one(score_node, 'Part')
+        self.assertEqual(find_exactly_one(part_node, 'Staff').get('id'), '1')
+        self.assertEqual(find_exactly_one(part_node, 'Instrument/longName').text, 'Piano')
 
-        staff_node = self._find_exactly_one(score_node, 'Staff')
-        vbox_text_node = self._find_exactly_one(staff_node, 'VBox/Text')
-        self.assertEqual(self._find_exactly_one(vbox_text_node, 'style').text, 'Title')
-        self.assertEqual(self._find_exactly_one(vbox_text_node, 'text').text, _TITLE)
+        staff_node = find_exactly_one(score_node, 'Staff')
+        vbox_text_node = find_exactly_one(staff_node, 'VBox/Text')
+        self.assertEqual(find_exactly_one(vbox_text_node, 'style').text, 'Title')
+        self.assertEqual(find_exactly_one(vbox_text_node, 'text').text, _TITLE)
 
         self.assertEqual(len(staff_node.findall('Measure')), 1)
 
     def test_split_write_multi_part_same_name(self):
-        _TITLE = 'Multi Part'
-
-        parts = self._multi_part_same_name_score.split_to_part_scores()
-        print(ET.tostring(parts[0]._xml_tree).decode('UTF-8'))
+        # _TITLE = 'Multi Part'
+        #
+        # parts = self._multi_part_same_name_score.split_to_part_scores()
+        # print(ET.tostring(parts[1]._xml_tree).decode('UTF-8'))
 
         self.assertEqual(True, False)
 
     def test_split_write_multi_part_multi_staves(self):
+        # _TITLE = 'Multi Part with Multi Staves'
+        #
+        # parts = self._multi_part_multi_staves_score.split_to_part_scores()
+        # print(ET.tostring(parts[1]._xml_tree).decode('UTF-8'))
+
         self.assertEqual(True, False)
 
     def test_split_multi_part_already_assigned_raises(self):
@@ -70,14 +76,9 @@ class TestScore(unittest.TestCase):
 
     def _assert_nonlinked_score_metadata_is_expected(self, score_xml, work_title):
         # MuseScore default, true for all the resource files
-        self.assertEqual(self._find_exactly_one(score_xml, 'Style/Spatium').text, '1.76389')
+        self.assertEqual(find_exactly_one(score_xml, 'Style/Spatium').text, '1.76389')
         self.assertGreater(len(score_xml.findall('metaTag')), 1)
-        self.assertEqual(self._find_exactly_one(score_xml, 'metaTag/[@name="workTitle"]').text, work_title)
-
-    def _find_exactly_one(self, node, findall_arg):
-        children = node.findall(findall_arg)
-        self.assertEqual(len(children), 1)
-        return children[0]
+        self.assertEqual(find_exactly_one(score_xml, 'metaTag/[@name="workTitle"]').text, work_title)
 
 
 def _write_score_to_temp_file_and_read_xml(score):

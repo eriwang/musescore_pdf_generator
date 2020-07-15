@@ -1,8 +1,10 @@
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 import copy
 import os
 import xml.etree.ElementTree as ET
 import zipfile
+
+from utils.xml_utils import find_exactly_one
 
 # App flow:
 # - Get an mscz or mscx
@@ -25,8 +27,6 @@ import zipfile
 #           - If PDF page count > min PDF page count, then final PDF is the previous one.
 #   - If not, just convert with the parts and you're done
 
-_Part = namedtuple('_Part', ['index', 'name', 'staff_ids', 'xml'])
-
 
 class Score:
     def __init__(self, xml_tree):
@@ -47,52 +47,26 @@ class Score:
         if self.has_manual_parts():
             raise ValueError('Not splitting part scores for score with manual parts')
 
-        part_nodes = list(self._xml_tree.findall('Score/Part'))
-        if len(part_nodes) == 1:
+        if len(self._xml_tree.findall('Score/Part')) == 1:
             return [Score(copy.deepcopy(self._xml_tree))]
 
-        parts = []
+        parts = _PartScore.create_parts_from_xml(self._xml_tree)
+
         part_name_to_num_appearances = defaultdict(int)
-        for index, part in enumerate(self._xml_tree.findall('Score/Part')):
-            name_nodes = part.findall('Instrument/longName')
-            assert len(name_nodes) == 1
+        for part_node in self._xml_tree.findall('Score/Part'):
+            part_name_to_num_appearances[find_exactly_one(part_node, 'Instrument/longName').text] += 1
 
-            name = name_nodes[0].text
-            part_name_to_num_appearances[name] += 1
-
-            parts.append(_Part(
-                index=index,
-                name=name,
-                staff_ids=[staff.get('id') for staff in part.findall('Staff')],
-                xml=copy.deepcopy(self._xml_tree)
-            ))
-
-        # Note that this does not handle if there's a "Violin 1", "Violin", and "Violin" part,
-        # as it's unclear what should be done (maybe the violin parts should be named "Solo Violin", for example)
-        part_name_to_current_number = defaultdict(int)
+        # Note that this does not handle if there's a "Violin 1", "Violin", and "Violin" part.
+        # It's unclear what should be done (maybe the violin parts should be named "Solo Violin", for example)
+        part_name_to_correct_part_number = defaultdict(int)
         for part in parts:
-            is_duplicate_part = part_name_to_num_appearances[part.name] > 1
-            if is_duplicate_part:
-                part_name_to_current_number[part.name] += 1
-                part._replace(name=f'{part.name} {part_name_to_current_number[part.name]}')
+            part_name = part.get_name()
+            is_duplicate_part_name = part_name_to_num_appearances[part_name] > 1
+            if is_duplicate_part_name:
+                part_name_to_correct_part_number[part_name] += 1
+                part.set_name(f'{part_name} {part_name_to_correct_part_number[part_name]}')
 
-            score_nodes = part.xml.findall('Score')
-            assert len(score_nodes) == 1
-            score_node = score_nodes[0]
-
-            for index, part_node in enumerate(score_node.findall('Part')):
-                if index != part.index:
-                    score_node.remove(part_node)
-
-            for staff in score_node.findall('Staff'):
-                if staff.get('id') not in part.staff_ids:
-                    score_node.remove(staff)
-
-        # notes:
-        # - should have VBox (copy from original to keep subtitle and whatnot?)
-        # - staff id needs to start at 1
-
-        return [Score(p.xml) for p in parts]
+        return parts
 
     def write_mscx_to_file(self, f):
         ET.ElementTree(self._xml_tree).write(f, encoding='UTF-8')
@@ -113,3 +87,89 @@ class Score:
                     return cls(ET.fromstring(item.read_text()))
 
         raise ValueError(f'No .mscx files found in {filepath}')
+
+
+class _PartScore:
+    def __init__(self, xml_tree):
+        self._xml_tree = xml_tree
+
+    def get_name(self):
+        return self._get_name_node().text
+
+    def set_name(self, name):
+        self._get_name_node().text = name
+
+    def _get_name_node(self):
+        vbox_text_nodes = self._xml_tree.findall('Score/Staff/[@id="1"]/VBox/Text')
+        for vbox_text_node in vbox_text_nodes:
+            if find_exactly_one(vbox_text_node, 'style').text == 'Instrument Name (Part)':
+                return find_exactly_one(vbox_text_node, 'text')
+
+        raise ValueError('No vbox part node found')
+
+    @classmethod
+    def create_parts_from_xml(cls, xml_tree):
+        vbox_node = find_exactly_one(xml_tree, 'Score/Staff/[@id="1"]/VBox')
+
+        parts = []
+        for part_index in range(len(xml_tree.findall('Score/Part'))):
+            part_xml_tree = copy.deepcopy(xml_tree)
+
+            # Ordering is important for these method calls, as they depend on each other's results.
+            _PartScore._remove_unneeded_parts(part_xml_tree, part_index)
+            _PartScore._remove_unneeded_staves_and_staff_vbox(part_xml_tree)
+            _PartScore._add_vbox_with_part_text(part_xml_tree, vbox_node)
+            _PartScore._fix_staff_ids(part_xml_tree)
+
+            parts.append(cls(part_xml_tree))
+
+        return parts
+
+    @staticmethod
+    def _remove_unneeded_parts(xml_tree, part_index):
+        score_node = find_exactly_one(xml_tree, 'Score')
+        for i, part_node in enumerate(score_node.findall('Part')):
+            if i != part_index:
+                score_node.remove(part_node)
+
+    @staticmethod
+    def _remove_unneeded_staves_and_staff_vbox(xml_tree):
+        staff_ids = [staff.get('id') for staff in xml_tree.findall('Score/Part/Staff')]
+
+        score_node = find_exactly_one(xml_tree, 'Score')
+        for score_staff_node in score_node.findall('Staff'):
+            if score_staff_node.get('id') not in staff_ids:
+                score_node.remove(score_staff_node)
+                continue
+
+            existing_staff_vbox_node = score_staff_node.find('VBox')
+            if existing_staff_vbox_node is not None:
+                score_staff_node.remove(existing_staff_vbox_node)
+
+    @staticmethod
+    def _add_vbox_with_part_text(xml_tree, original_vbox_node):
+        vbox_text_node = ET.Element('Text')
+
+        vbox_text_style_node = ET.Element('style')
+        vbox_text_style_node.text = 'Instrument Name (Part)'
+
+        vbox_text_text_node = ET.Element('text')
+        vbox_text_text_node.text = find_exactly_one(xml_tree, 'Score/Part/Instrument/longName').text
+
+        vbox_text_node.extend([vbox_text_style_node, vbox_text_text_node])
+
+        vbox_node = copy.deepcopy(original_vbox_node)
+        vbox_node.append(vbox_text_node)
+
+        xml_tree.find('Score/Staff').insert(0, vbox_node)
+
+    @staticmethod
+    def _fix_staff_ids(xml_tree):
+        staff_nodes = xml_tree.findall('Score/Staff')
+        part_staff_nodes = xml_tree.findall('Score/Part/Staff')
+        assert len(staff_nodes) == len(part_staff_nodes)
+
+        for i, (staff_node, part_staff_node) in enumerate(zip(staff_nodes, part_staff_nodes)):
+            staff_id = str(i + 1)
+            staff_node.set('id', staff_id)
+            part_staff_node.set('id', staff_id)
