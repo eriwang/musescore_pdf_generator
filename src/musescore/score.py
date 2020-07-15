@@ -98,6 +98,7 @@ class _PartScore:
     def get_name(self):
         return self._get_name_node().text
 
+    # This only changes the VBox part name, as I don't believe the instrument longName does anything for one staff.
     def set_name(self, name):
         self._get_name_node().text = name
 
