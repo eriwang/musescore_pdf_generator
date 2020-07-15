@@ -1,5 +1,4 @@
 import xml.etree.ElementTree as ET
-import tempfile
 import unittest
 
 from musescore.score import Score
@@ -23,7 +22,7 @@ class TestScore(unittest.TestCase):
 
         [part] = self._single_part_score.generate_part_scores()
 
-        root = _write_score_to_temp_file_and_read_xml(part)
+        root = _write_score_to_string_and_read_xml(part)
         self._assert_nonlinked_score_metadata_correct(root, _TITLE)
         self._assert_part_correct(root, ['1'], 'Piano')
         self._assert_staves_one_measure(root)
@@ -34,14 +33,14 @@ class TestScore(unittest.TestCase):
 
         [violin1, violin2] = self._multi_part_same_name_score.generate_part_scores()
 
-        violin1_root = _write_score_to_temp_file_and_read_xml(violin1)
+        violin1_root = _write_score_to_string_and_read_xml(violin1)
         self._assert_nonlinked_score_metadata_correct(violin1_root, _TITLE)
         self._assert_part_correct(violin1_root, ['1'], 'Violin')
         self._assert_staves_one_measure(violin1_root)
         self._assert_vbox_field_match(violin1_root, 'Title', _TITLE)
         self._assert_vbox_field_match(violin1_root, 'Instrument Name (Part)', 'Violin 1')
 
-        violin2_root = _write_score_to_temp_file_and_read_xml(violin2)
+        violin2_root = _write_score_to_string_and_read_xml(violin2)
         self._assert_nonlinked_score_metadata_correct(violin2_root, _TITLE)
         self._assert_part_correct(violin2_root, ['1'], 'Violin')
         self._assert_staves_one_measure(violin2_root)
@@ -53,14 +52,14 @@ class TestScore(unittest.TestCase):
 
         [violin, piano] = self._multi_part_multi_staves_score.generate_part_scores()
 
-        violin_root = _write_score_to_temp_file_and_read_xml(violin)
+        violin_root = _write_score_to_string_and_read_xml(violin)
         self._assert_nonlinked_score_metadata_correct(violin_root, _TITLE)
         self._assert_part_correct(violin_root, ['1'], 'Violin')
         self._assert_staves_one_measure(violin_root)
         self._assert_vbox_field_match(violin_root, 'Title', _TITLE)
         self._assert_vbox_field_match(violin_root, 'Instrument Name (Part)', 'Violin')
 
-        piano_root = _write_score_to_temp_file_and_read_xml(piano)
+        piano_root = _write_score_to_string_and_read_xml(piano)
         self._assert_nonlinked_score_metadata_correct(piano_root, _TITLE)
         self._assert_part_correct(piano_root, ['1', '2'], 'Piano')
         self._assert_staves_one_measure(piano_root)
@@ -106,11 +105,8 @@ class TestScore(unittest.TestCase):
         self.assertEqual(matching_nodes, 1, 'Did not find a matching node')
 
 
-def _write_score_to_temp_file_and_read_xml(score):
-    with tempfile.TemporaryFile() as f:
-        score.write_mscx_to_file(f)
-        f.seek(0)
-        return ET.fromstring(f.read())
+def _write_score_to_string_and_read_xml(score):
+    return ET.fromstring(score.get_mscx_as_string())
 
 
 if __name__ == '__main__':
