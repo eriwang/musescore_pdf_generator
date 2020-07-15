@@ -6,27 +6,6 @@ import zipfile
 
 from utils.xml_utils import find_exactly_one, create_node_with_text
 
-# App flow:
-# - Get an mscz or mscx
-# - Read the XML
-# - If it has parts already
-#   - All good
-# - If not:
-#   - Split the XML into the associated parts
-#       - Get parts
-#           - Save Part.trackName, if there's dupes fix them based on ordering.
-#           - Save Part.staff[id]
-#       - Make new XML for each part
-#           - Delete staves that don't match the staff id
-#           - Make the staff.vbox element
-#           - Save XML to mscx
-# - Toss files into musescore for the conversion to pdf
-#   - If it's a custom part mscx:
-#       - Try the minimum layout settings, convert, and check PDF page count (that's the minimum page count)
-#       - Increase the layout settings (TBD what I change), convert, and check PDF page count again.
-#           - If PDF page count > min PDF page count, then final PDF is the previous one.
-#   - If not, just convert with the parts and you're done
-
 # I discovered shortly after implementing this that the MuseScore CLI can auto-generate parts when generating PDFs (but
 # not mscz or mscx interestingly) if scores do not already have them. To do this, use the "-P" (--export-score-parts)
 # flag with either -o (regular conversion) or -j (batch conversion, seems like you must specify a "score" pdf as well as
@@ -63,6 +42,12 @@ class Score:
 
     def get_mscx_as_string(self):
         return ET.tostring(self._xml_tree)
+
+    # Worth noting that MuseScore does have a "style file" that also has this value, which the CLI is supposed to be
+    # able to use. However, when I change spatium there, it shrinks notes but doesn't adjust staff position accordingly.
+    # Setting it in the mscx file instead shrinks notes and adjusts staff position, which is the desired behavior.
+    def set_spatium(self, spatium):
+        find_exactly_one(self._xml_tree, 'Score/Style/Spatium').text = str(spatium)
 
     @classmethod
     def create_from_file(cls, filepath):

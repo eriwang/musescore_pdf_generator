@@ -1,17 +1,13 @@
-import xml.etree.ElementTree as ET
 import json
 import subprocess
 import os
 import platform
 
 from utils.tempfile_utils import temporary_named_file
-from utils.xml_utils import create_node_with_text
 
 # TODO: should be default install location, and if user installs it elsewhere they need to tell the app
 _MUSESCORE_BINARY = 'C:/Program Files/MuseScore 3/bin/MuseScore3.exe' if platform.system() == 'Windows' else \
                     '/mnt/c/Program Files/MuseScore 3/bin/MuseScore3.exe'
-_MINIMUM_SPATIUM = 1.5
-_SPATIUM_INCREMENT = 0.025
 
 # https://musescore.org/en/handbook/command-line-options
 class MuseScore:
@@ -35,23 +31,8 @@ class MuseScore:
         if os.path.splitext(out_filename)[1] != '.pdf':
             raise ValueError('Out filename must be of type .pdf')
 
-        with temporary_named_file(content=_create_style_file_text(_MINIMUM_SPATIUM), suffix='.mss') as style_file:
-            subprocess.check_call([self._binary_path, src_filepath, '-o', out_filename, '-S', style_file])
+        subprocess.check_call([self._binary_path, src_filepath, '-o', out_filename])
 
     @staticmethod
     def _get_pdf_prefix(src_filepath):
         return os.path.splitext(os.path.basename(src_filepath))[0]
-
-
-def _create_style_file_text(spatium):
-    style_file_root = ET.Element('museScore', version='3.01')
-    style_node = ET.SubElement(style_file_root, 'Style')
-    style_node.extend([
-        create_node_with_text('createMultimeasureRests', '1'),
-        create_node_with_text('minEmptyMeasures', '2'),
-        create_node_with_text('minMMRestWidth', '4'),
-        create_node_with_text('multiMeasureRestMargin', '1.2'),
-        create_node_with_text('Spatium', str(spatium))
-    ])
-
-    return ET.tostring(style_file_root)
