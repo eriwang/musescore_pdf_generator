@@ -1,45 +1,39 @@
 import os
 
-from PyPDF2 import PdfFileReader
-
-from musescore.musescore_runner import MuseScore
+from drive.drive import Drive
 from musescore.score import Score
-from utils.tempfile_utils import scoped_named_temporary_file
+from musescore.score_pdf_conversion import convert_score_to_pdf_optimize_spatium
 
+_TEST_FOLDER_ROOT_ID = '11HTp4Y8liv9Oc0Sof0bxvlsGSLmQAvl4'
 
+# App flow:
+# - Every so often, do a traversal of the "root" folder and store all musescore file IDs
+#   - If there's any new ones, generate PDFs for them.
+#   - Fine to ignore old ones, just stop generating for them
+# - Listen to changes API. If a file ID appears that's in the musescore file ID list, regen
+
+# TODO: next up, take a file through the whole "download gen upload to dir" pipeline,
+#       then listen to changes
+#       then make it just run forever, listening to changes, refreshing them, and generating
 def main():
-    out_path = 'C:/Users/johne/Desktop/musescore_pdf_gen_testing/'
-    gurenge_file = 'C:/Users/johne/Desktop/connect_trio_no_parts.mscz'
-    score = Score.create_from_file(gurenge_file)
+    d = Drive.create_authenticate_and_start()
+    files = d.recursively_search_directory(_TEST_FOLDER_ROOT_ID)
+    print([f for f in files if _drive_file_is_musescore_file(f)])
 
-    _convert_score_to_pdf_optimize_spatium(score, os.path.join(out_path, 'Gurenge.pdf'))
+
+def _convert_file_to_pdf(filename, out_path, song_name):
+    score = Score.create_from_file(filename)
+
+    convert_score_to_pdf_optimize_spatium(score, os.path.join(out_path, f'{song_name}.pdf'))
     for part in score.generate_part_scores():
-        out_filename = os.path.join(out_path, f'Gurenge - {part.name}.pdf')
-        _convert_score_to_pdf_optimize_spatium(part, out_filename)
+        out_filename = os.path.join(out_path, f'{song_name} - {part.name}.pdf')
+        convert_score_to_pdf_optimize_spatium(part, out_filename)
 
 
-def _convert_score_to_pdf_optimize_spatium(score, out_filename):
-    _MINIMUM_SPATIUM = 1.5
-    _MUSESCORE_DEFAULT_SPATIUM = 1.76389
-    _SPATIUM_INCREMENT = 0.025
-
-    spatium = _MINIMUM_SPATIUM
-    minimum_pdf_num_pages = None
-    while spatium <= _MUSESCORE_DEFAULT_SPATIUM:
-        _convert_score_to_pdf_with_spatium(score, out_filename, spatium)
-        pdf_num_pages = PdfFileReader(out_filename).getNumPages()
-        if minimum_pdf_num_pages is None:
-            minimum_pdf_num_pages = pdf_num_pages
-        elif pdf_num_pages > minimum_pdf_num_pages:
-            _convert_score_to_pdf_with_spatium(score, out_filename, spatium - _SPATIUM_INCREMENT)
-            break
-
-        spatium += _SPATIUM_INCREMENT
-
-
-def _convert_score_to_pdf_with_spatium(score, out_filename, spatium):
-    with scoped_named_temporary_file(content=score.get_mscx_as_string(), suffix='.mscx') as mscx:
-        MuseScore().convert_to_pdf(mscx, out_filename, spatium)
+def _drive_file_is_musescore_file(drive_file):
+    extension = os.path.splitext(drive_file.name)[1]
+    return (drive_file.mime_type == 'application/x-musescore') or \
+           (extension == '.mscx' and drive_file.mime_type == 'text/xml')
 
 
 if __name__ == '__main__':
