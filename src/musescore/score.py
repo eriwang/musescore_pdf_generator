@@ -6,6 +6,7 @@ import zipfile
 
 from utils.xml_utils import find_exactly_one, create_node_with_text
 
+
 # I discovered shortly after implementing this that the MuseScore CLI can auto-generate parts when generating PDFs (but
 # not mscz or mscx interestingly) if scores do not already have them. To do this, use the "-P" (--export-score-parts)
 # flag with either -o (regular conversion) or -j (batch conversion, seems like you must specify a "score" pdf as well as
@@ -42,10 +43,6 @@ class Score:
 
     def get_mscx_as_string(self):
         return ET.tostring(self._xml_tree)
-
-    # TODO: move this back to styles now that I have a workaround
-    def set_spatium(self, spatium):
-        find_exactly_one(self._xml_tree, 'Score/Style/Spatium').text = str(spatium)
 
     @classmethod
     def create_from_file(cls, filepath):

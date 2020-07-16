@@ -29,8 +29,7 @@ class Drive:
 
         download_complete = False
         while not download_complete:
-            status, download_complete = downloader.next_chunk()
-            print(f'Download {int(status.progress() * 100)}% complete')
+            _, download_complete = downloader.next_chunk()
 
         f.close()
         yield f.name
