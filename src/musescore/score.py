@@ -82,7 +82,6 @@ class Score:
                 part.set_name(f'{part_name} {part_name_to_correct_part_number[part_name]}')
 
 
-# TODO: remove breaks of any kind?
 class _PartScore:
     def __init__(self, xml_tree):
         self.xml_tree = xml_tree

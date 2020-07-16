@@ -1,5 +1,4 @@
 # Application Files
-*.db
 *.log
 
 # Dev Directories
@@ -11,3 +10,7 @@ venv/
 *.spec
 build/
 dist/
+
+# Drive Auth
+token.pickle
+credentials.json
