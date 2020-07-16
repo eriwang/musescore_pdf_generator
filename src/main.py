@@ -4,7 +4,7 @@ from PyPDF2 import PdfFileReader
 
 from musescore.musescore_runner import MuseScore
 from musescore.score import Score
-from utils.tempfile_utils import temporary_named_file
+from utils.tempfile_utils import scoped_named_temporary_file
 
 
 def main():
@@ -39,7 +39,7 @@ def _convert_score_to_pdf_optimize_spatium(score, out_filename):
 
 def _convert_score_to_pdf_with_spatium(score, spatium, out_filename):
     score.set_spatium(spatium)
-    with temporary_named_file(content=score.get_mscx_as_string(), suffix='.mscx') as mscx:
+    with scoped_named_temporary_file(content=score.get_mscx_as_string(), suffix='.mscx') as mscx:
         MuseScore().convert_to_pdf(mscx, out_filename)
 
 

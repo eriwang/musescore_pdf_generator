@@ -5,7 +5,7 @@ import tempfile
 
 # https://stackoverflow.com/a/57701186
 @contextlib.contextmanager
-def temporary_named_file(content, suffix=None):
+def scoped_named_temporary_file(content, suffix=None):
     if isinstance(content, str):
         content = str.encode(content)
 

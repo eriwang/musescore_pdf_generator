@@ -43,9 +43,7 @@ class Score:
     def get_mscx_as_string(self):
         return ET.tostring(self._xml_tree)
 
-    # Worth noting that MuseScore does have a "style file" that also has this value, which the CLI is supposed to be
-    # able to use. However, when I change spatium there, it shrinks notes but doesn't adjust staff position accordingly.
-    # Setting it in the mscx file instead shrinks notes and adjusts staff position, which is the desired behavior.
+    # TODO: move this back to styles now that I have a workaround
     def set_spatium(self, spatium):
         find_exactly_one(self._xml_tree, 'Score/Style/Spatium').text = str(spatium)
 
