@@ -1,9 +1,9 @@
 from collections import defaultdict
 import copy
-import os
 import xml.etree.ElementTree as ET
 import zipfile
 
+from utils.os_path_utils import get_extension
 from utils.xml_utils import find_exactly_one, create_node_with_text
 
 
@@ -17,6 +17,9 @@ class Score:
     def __init__(self, name, xml_tree):
         self.name = name
         self._xml_tree = xml_tree
+
+    def get_number_of_parts(self):
+        return len(self._xml_tree.findall('Score/Part'))
 
     def has_manual_parts(self):
         sub_score_nodes = self._xml_tree.findall('Score/Score')
@@ -46,8 +49,7 @@ class Score:
 
     @classmethod
     def create_from_file(cls, filepath):
-        _, ext = os.path.splitext(filepath)
-
+        ext = get_extension(filepath)
         if ext == '.mscx':
             return cls(None, ET.parse(filepath).getroot())
         if ext != '.mscz':

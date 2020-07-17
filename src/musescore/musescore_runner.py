@@ -4,6 +4,7 @@ import os
 import platform
 import xml.etree.ElementTree as ET
 
+from utils.os_path_utils import get_extension
 from utils.tempfile_utils import scoped_named_temporary_file
 from utils.xml_utils import create_node_with_text
 
@@ -19,19 +20,18 @@ class MuseScore:
 
         self._binary_path = binary_path
 
-    def convert_mscz_to_pdf_with_manual_parts(self, mscz_filepath, out_dir):
-        prefix = os.path.splitext(os.path.basename(mscz_filepath))[0]
-        pdf_path_prefix = os.path.join(out_dir, prefix)
+    def convert_mscz_to_pdf_with_manual_parts(self, song_name, mscz_filepath, out_dir):
+        pdf_path_prefix = os.path.join(out_dir, song_name)
         musescore_job_params = [{
             'in': mscz_filepath,
-            'out': [f'{pdf_path_prefix}.pdf', [f'{pdf_path_prefix} - ', '.pdf']]
+            'out': [f'{pdf_path_prefix}.gen.pdf', [f'{pdf_path_prefix} - ', '.gen.pdf']]
         }]
 
         with scoped_named_temporary_file(content=json.dumps(musescore_job_params), suffix='.json') as job_json_filepath:
             subprocess.check_call([self._binary_path, '-j', job_json_filepath])
 
     def convert_to_pdf(self, src_filepath, out_filename, spatium=None):
-        if os.path.splitext(out_filename)[1] != '.pdf':
+        if get_extension(out_filename) != '.pdf':
             raise ValueError('Out filename must be of type .pdf')
 
         # For some reason, CLI MuseScore conversion doesn't apply style files to PDF conversion, but does to mscx (maybe
@@ -43,6 +43,7 @@ class MuseScore:
             with scoped_named_temporary_file(content='', suffix='.mscx') as mscx_with_styles:
                 subprocess.check_call([self._binary_path, src_filepath, '-S', style_filepath, '-o', mscx_with_styles])
                 subprocess.check_call([self._binary_path, mscx_with_styles, '-o', out_filename])
+        print(out_filename)
 
     @staticmethod
     def _create_style_file_text(spatium):

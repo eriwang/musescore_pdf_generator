@@ -14,26 +14,19 @@ class DriveFile:
     id: str
     name: str
     mime_type: str
+    parents: list
 
     def is_folder(self):
         return self.mime_type == 'application/vnd.google-apps.folder'
 
     @classmethod
     def create_from_drive_api_response(cls, response):
-        return cls(id=response['id'], name=response['name'], mime_type=response['mimeType'])
+        return cls(id=response['id'],
+                   name=response['name'],
+                   mime_type=response['mimeType'],
+                   parents=response['parents'])
 
 
-# What should this be able to do?
-# - Get changes until up to date
-# - Poll for changes, looking at the snapshot ID
-# - Download a specific file that changed
-# - Upload PDFs in the dir for that file
-# - Be able to do a batch conversion on some directory
-# - Hook up the change finding to the download/ gen/ upload pipeline (not the job of this class)
-#
-# - given a musescore file id:
-#     - If it's in >1 parent, nope out. It's not clear where the PDF should be generated for that case.
-#     - check if it's in the folder i want (which might need to be recursive file checks, annoyingly enough)'''
 class Drive:
     def __init__(self, service):
         self._service = service
@@ -52,7 +45,10 @@ class Drive:
         os.remove(f.name)
 
     def recursively_search_directory(self, directory_id):
-        dir_items = self._service.files().list(q=f'parents in "{directory_id}" and trashed = false').execute()
+        dir_items = self._service.files().list(
+            q=f'parents in "{directory_id}" and trashed = false',
+            fields='incompleteSearch, files/id, files/name, files/mimeType, files/parents'
+        ).execute()
         if dir_items['incompleteSearch']:
             raise ValueError(f'Incomplete search for {directory_id}, not yet handled')
 
