@@ -45,14 +45,7 @@ class Drive:
         os.remove(f.name)
 
     def recursively_search_directory(self, directory_id):
-        dir_items = self._service.files().list(
-            q=f'parents in "{directory_id}" and trashed = false',
-            fields='incompleteSearch, files/id, files/name, files/mimeType, files/parents'
-        ).execute()
-        if dir_items['incompleteSearch']:
-            raise ValueError(f'Incomplete search for {directory_id}, not yet handled')
-
-        dir_drive_files = [DriveFile.create_from_drive_api_response(item) for item in dir_items['files']]
+        dir_drive_files = self._list_directory(directory_id)
 
         files = []
         dir_folders = []
@@ -63,16 +56,46 @@ class Drive:
         for folder in dir_folders:
             files.extend(self.recursively_search_directory(folder.id))
 
-        # TODO: want name, mimeType, id, parents (for now hard fail if mscz has multiple parents)
         return files
 
-    def upload_file(self, filename, parent_directory_id):
-        file_metadata = {
-            'name': os.path.basename(filename),
-            'parents': [parent_directory_id]
-        }
-        self._service.files().create(body=file_metadata, media_body=MediaFileUpload(filename)).execute()
+    # Drive allows multiple files to have the same name, if one exists we just update it.
+    def upload_or_update_file(self, filename, parent_directory_id):
+        file_basename = os.path.basename(filename)
+        matching_file_id = self._find_matching_file_in_dir(file_basename, parent_directory_id)
+
+        file_metadata = {'name': file_basename}
+        media_body = MediaFileUpload(filename)
+        file_service = self._service.files()
+        if matching_file_id is None:
+            file_metadata['parents'] = [parent_directory_id]
+            file_service.create(body=file_metadata, media_body=media_body).execute()
+        else:
+            # there's a newRevision boolean param as well, for now not set but maybe worth considering.
+            file_service.update(fileId=matching_file_id, body=file_metadata, media_body=media_body).execute()
 
     @classmethod
     def create_authenticate_and_start(cls):
         return cls(build('drive', 'v3', credentials=get_credentials()))
+
+    def _list_directory(self, directory_id):
+        dir_items = self._service.files().list(
+            q=f'parents in "{directory_id}" and trashed = false',
+            fields='incompleteSearch, files/id, files/name, files/mimeType, files/parents'
+        ).execute()
+        if dir_items['incompleteSearch']:
+            raise ValueError(f'Incomplete search for {directory_id}, not yet handled')
+
+        return [DriveFile.create_from_drive_api_response(item) for item in dir_items['files']]
+
+    def _find_matching_file_in_dir(self, file_basename, parent_directory_id):
+        dir_drive_files = self._list_directory(parent_directory_id)
+        matching_file_id = None
+        for drive_file in dir_drive_files:
+            if drive_file.is_folder() or drive_file.name != file_basename:
+                continue
+            if matching_file_id is not None:
+                raise ValueError(f'Found multiple matches for {file_basename} in directory {parent_directory_id}')
+
+            matching_file_id = drive_file.id
+
+        return matching_file_id

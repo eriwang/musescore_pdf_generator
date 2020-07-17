@@ -20,6 +20,7 @@ class MuseScore:
 
         self._binary_path = binary_path
 
+    # TODO: some weirdness with tempo note font. Probably related to parsing and rewriting file. Only with FE3H?????
     def convert_mscz_to_pdf_with_manual_parts(self, song_name, mscz_filepath, out_dir):
         pdf_path_prefix = os.path.join(out_dir, song_name)
         musescore_job_params = [{
@@ -43,7 +44,6 @@ class MuseScore:
             with scoped_named_temporary_file(content='', suffix='.mscx') as mscx_with_styles:
                 subprocess.check_call([self._binary_path, src_filepath, '-S', style_filepath, '-o', mscx_with_styles])
                 subprocess.check_call([self._binary_path, mscx_with_styles, '-o', out_filename])
-        print(out_filename)
 
     @staticmethod
     def _create_style_file_text(spatium):

@@ -90,6 +90,7 @@ class _PartScore:
     def set_name(self, name):
         self._get_name_node().text = name
 
+    # TODO: Losing some information during the split. Tempo, system text, rehearsal marks are what I've seen so far
     @classmethod
     def create_parts_from_xml(cls, xml_tree):
         vbox_node = find_exactly_one(xml_tree, 'Score/Staff/[@id="1"]/VBox')

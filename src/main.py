@@ -61,7 +61,7 @@ def _convert_with_manual_parts_to_pdf_and_upload(drive, score, upload_dir, song_
     with tempfile.TemporaryDirectory() as tempdir:
         convert_with_manual_parts_to_pdf(score, tempdir, song_name)
         for gen_file in os.listdir(tempdir):
-            drive.upload_file(os.path.join(tempdir, gen_file), upload_dir)
+            drive.upload_or_update_file(os.path.join(tempdir, gen_file), upload_dir)
 
 
 def _convert_to_pdf_and_upload(drive, score, output_filename, upload_dir, optimize_spatium):
@@ -72,7 +72,7 @@ def _convert_to_pdf_and_upload(drive, score, output_filename, upload_dir, optimi
         else:
             convert_to_pdf(score, output_filename)
 
-        drive.upload_file(output_filename, upload_dir)
+        drive.upload_or_update_file(output_filename, upload_dir)
 
 
 if __name__ == '__main__':
