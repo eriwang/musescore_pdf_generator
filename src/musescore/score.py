@@ -13,6 +13,8 @@ from utils.xml_utils import find_exactly_one, create_node_with_text
 # the "parts" pdfs). However, I also want to manipulate the layout on the individual parts programatically, which is
 # currently unsupported by the MuseScore batch conversion (can specify one style file for the whole job, not on a
 # by-part basis). Therefore I'm still doing the manual splitting of MuseScore parts here when needed.
+# TODO: fix <text><b></b><font face="ScoreText"></font>...<b><font face="FreeSerif"></font> = 188
+#       </b></text>, new version is <text><sym>metNoteQuarterUp</sym> = 80</text>
 class Score:
     def __init__(self, name, xml_tree):
         self.name = name
@@ -60,6 +62,8 @@ class Score:
             for item in path.iterdir():
                 if item.name.endswith('.mscx'):
                     return cls(None, ET.fromstring(item.read_text()))
+
+        # TODO: fix tempo thing here
 
         raise ValueError(f'No .mscx files found in {filepath}')
 

@@ -12,6 +12,7 @@ from utils.xml_utils import create_node_with_text
 _MUSESCORE_BINARY = 'C:/Program Files/MuseScore 3/bin/MuseScore3.exe' if platform.system() == 'Windows' else \
                     '/mnt/c/Program Files/MuseScore 3/bin/MuseScore3.exe'
 
+
 # https://musescore.org/en/handbook/command-line-options
 class MuseScore:
     def __init__(self, binary_path=_MUSESCORE_BINARY):
@@ -20,7 +21,6 @@ class MuseScore:
 
         self._binary_path = binary_path
 
-    # TODO: some weirdness with tempo note font. Probably related to parsing and rewriting file. Only with FE3H?????
     def convert_mscz_to_pdf_with_manual_parts(self, song_name, mscz_filepath, out_dir):
         pdf_path_prefix = os.path.join(out_dir, song_name)
         musescore_job_params = [{
