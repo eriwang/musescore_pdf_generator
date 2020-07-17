@@ -1,10 +1,11 @@
 from collections import defaultdict
 import copy
-import os
 import xml.etree.ElementTree as ET
 import zipfile
 
+from utils.os_path_utils import get_extension
 from utils.xml_utils import find_exactly_one, create_node_with_text
+
 
 # I discovered shortly after implementing this that the MuseScore CLI can auto-generate parts when generating PDFs (but
 # not mscz or mscx interestingly) if scores do not already have them. To do this, use the "-P" (--export-score-parts)
@@ -12,10 +13,15 @@ from utils.xml_utils import find_exactly_one, create_node_with_text
 # the "parts" pdfs). However, I also want to manipulate the layout on the individual parts programatically, which is
 # currently unsupported by the MuseScore batch conversion (can specify one style file for the whole job, not on a
 # by-part basis). Therefore I'm still doing the manual splitting of MuseScore parts here when needed.
+# TODO: fix <text><b></b><font face="ScoreText"></font>...<b><font face="FreeSerif"></font> = 188
+#       </b></text>, new version is <text><sym>metNoteQuarterUp</sym> = 80</text>
 class Score:
     def __init__(self, name, xml_tree):
         self.name = name
         self._xml_tree = xml_tree
+
+    def get_number_of_parts(self):
+        return len(self._xml_tree.findall('Score/Part'))
 
     def has_manual_parts(self):
         sub_score_nodes = self._xml_tree.findall('Score/Score')
@@ -43,16 +49,9 @@ class Score:
     def get_mscx_as_string(self):
         return ET.tostring(self._xml_tree)
 
-    # Worth noting that MuseScore does have a "style file" that also has this value, which the CLI is supposed to be
-    # able to use. However, when I change spatium there, it shrinks notes but doesn't adjust staff position accordingly.
-    # Setting it in the mscx file instead shrinks notes and adjusts staff position, which is the desired behavior.
-    def set_spatium(self, spatium):
-        find_exactly_one(self._xml_tree, 'Score/Style/Spatium').text = str(spatium)
-
     @classmethod
     def create_from_file(cls, filepath):
-        _, ext = os.path.splitext(filepath)
-
+        ext = get_extension(filepath)
         if ext == '.mscx':
             return cls(None, ET.parse(filepath).getroot())
         if ext != '.mscz':
@@ -63,6 +62,8 @@ class Score:
             for item in path.iterdir():
                 if item.name.endswith('.mscx'):
                     return cls(None, ET.fromstring(item.read_text()))
+
+        # TODO: fix tempo thing here
 
         raise ValueError(f'No .mscx files found in {filepath}')
 
@@ -82,7 +83,6 @@ class Score:
                 part.set_name(f'{part_name} {part_name_to_correct_part_number[part_name]}')
 
 
-# TODO: remove breaks of any kind?
 class _PartScore:
     def __init__(self, xml_tree):
         self.xml_tree = xml_tree
@@ -94,6 +94,7 @@ class _PartScore:
     def set_name(self, name):
         self._get_name_node().text = name
 
+    # TODO: Losing some information during the split. Tempo, system text, rehearsal marks are what I've seen so far
     @classmethod
     def create_parts_from_xml(cls, xml_tree):
         vbox_node = find_exactly_one(xml_tree, 'Score/Staff/[@id="1"]/VBox')
