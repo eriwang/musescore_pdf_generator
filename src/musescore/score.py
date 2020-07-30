@@ -61,7 +61,7 @@ class Score:
             path = zipfile.Path(mscz)
             for item in path.iterdir():
                 if item.name.endswith('.mscx'):
-                    return cls(None, ET.fromstring(item.read_text()))
+                    return cls(None, ET.fromstring(item.read_bytes()))
 
         # TODO: fix tempo thing here
 
