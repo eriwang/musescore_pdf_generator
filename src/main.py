@@ -43,14 +43,15 @@ def _refresh_listening_file_id_index_and_regen(drive, root):
     return listening_file_ids
 
 
+# TODO: this doesn't take into account if pdfs are missing but the mscz file hasn't changed
 def _generate_pdfs_for_file_id_if_needed(drive, file_id):
     drive_file = drive.get_file_metadata(file_id)
     assert _is_processable_musescore_file(drive_file)
 
     gen_pdf_drive_files = [item for item in drive.list_directory(drive_file.parents[0])
                            if item.name.endswith('.gen.pdf')]
-    min_gen_pdf_modified_datetime = min([f.modified_datetime for f in gen_pdf_drive_files])
-    if drive_file.modified_datetime < min_gen_pdf_modified_datetime:
+    if len(gen_pdf_drive_files) > 0 and \
+            drive_file.modified_datetime < min([f.modified_datetime for f in gen_pdf_drive_files]):
         print(f'pdfs up to date for {drive_file.name}')
         return
 

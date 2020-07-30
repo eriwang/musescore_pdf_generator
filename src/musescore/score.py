@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import copy
 import xml.etree.ElementTree as ET
 import zipfile
@@ -13,8 +13,6 @@ from utils.xml_utils import find_exactly_one, create_node_with_text
 # the "parts" pdfs). However, I also want to manipulate the layout on the individual parts programatically, which is
 # currently unsupported by the MuseScore batch conversion (can specify one style file for the whole job, not on a
 # by-part basis). Therefore I'm still doing the manual splitting of MuseScore parts here when needed.
-# TODO: fix <text><b></b><font face="ScoreText"></font>...<b><font face="FreeSerif"></font> = 188
-#       </b></text>, new version is <text><sym>metNoteQuarterUp</sym> = 80</text>
 class Score:
     def __init__(self, name, xml_tree):
         self.name = name
@@ -61,9 +59,9 @@ class Score:
             path = zipfile.Path(mscz)
             for item in path.iterdir():
                 if item.name.endswith('.mscx'):
-                    return cls(None, ET.fromstring(item.read_text()))
-
-        # TODO: fix tempo thing here
+                    # It's important to call read_bytes as opposed to read_string here so we don't lose encoding
+                    # information: for example in older MuseScore files tempos use special characters.
+                    return cls(None, ET.fromstring(item.read_bytes()))
 
         raise ValueError(f'No .mscx files found in {filepath}')
 
@@ -94,10 +92,10 @@ class _PartScore:
     def set_name(self, name):
         self._get_name_node().text = name
 
-    # TODO: Losing some information during the split. Tempo, system text, rehearsal marks are what I've seen so far
     @classmethod
     def create_parts_from_xml(cls, xml_tree):
         vbox_node = find_exactly_one(xml_tree, 'Score/Staff/[@id="1"]/VBox')
+        measure_global_text_nodes_list = _PartScore._find_all_measure_global_text_nodes(xml_tree)
 
         parts = []
         for part_index in range(len(xml_tree.findall('Score/Part'))):
@@ -111,6 +109,9 @@ class _PartScore:
             _PartScore._remove_layout_breaks(part_xml_tree)
             _PartScore._add_vbox_with_part_text(part_xml_tree, vbox_node)
             _PartScore._fix_staff_ids(part_xml_tree)
+            # These were never removed from the first staff, so we skip this on the first part.
+            if part_index != 0:
+                _PartScore._apply_measure_global_text_nodes(part_xml_tree, measure_global_text_nodes_list)
 
             parts.append(cls(part_xml_tree))
 
@@ -123,6 +124,21 @@ class _PartScore:
                 return find_exactly_one(vbox_text_node, 'text')
 
         raise ValueError('No vbox part node found')
+
+    @staticmethod
+    def _find_all_measure_global_text_nodes(xml_tree):
+        _GLOBAL_TEXT_NODE_NAMES = ['RehearsalMark', 'Tempo', 'SystemText']
+
+        # At least as of time of writing, MuseScore only allows these elements on staff id 1 (i.e. the first staff)
+        measure_global_text_nodes_list = []
+        measure_voice_nodes = find_exactly_one(xml_tree, 'Score/Staff/[@id="1"]').findall('Measure/voice')
+        for i, measure_voice_node in enumerate(measure_voice_nodes):
+            global_text_nodes_for_measure = [child_node for child_node in measure_voice_node
+                                             if child_node.tag in _GLOBAL_TEXT_NODE_NAMES]
+            if len(global_text_nodes_for_measure) > 0:
+                measure_global_text_nodes_list.append(_MeasureGlobalTextNodes(i, global_text_nodes_for_measure))
+
+        return measure_global_text_nodes_list
 
     @staticmethod
     def _remove_unneeded_parts(xml_tree, part_index):
@@ -175,3 +191,22 @@ class _PartScore:
             staff_id = str(i + 1)
             staff_node.set('id', staff_id)
             part_staff_node.set('id', staff_id)
+
+    @staticmethod
+    def _apply_measure_global_text_nodes(xml_tree, measure_global_text_nodes_list):
+        measure_voice_nodes = find_exactly_one(xml_tree, 'Score/Staff/[@id="1"]').findall('Measure/voice')
+        for measure_global_text_nodes in measure_global_text_nodes_list:
+            measure_voice_node = measure_voice_nodes[measure_global_text_nodes.measure_index]
+            # Inserting the nodes right after Time/ KeySig (as opposed to just at the end) positions the global text at
+            # the beginning of the measure.
+            insertion_index = 0
+            for measure_voice_child_node in measure_voice_node:
+                if measure_voice_child_node.tag not in ['TimeSig', 'KeySig']:
+                    break
+                insertion_index += 1
+
+            # This inserts a list at insertion_index (i.e. list extend but in the middle)
+            measure_voice_node[insertion_index:insertion_index] = measure_global_text_nodes.nodes
+
+
+_MeasureGlobalTextNodes = namedtuple('_MeasureGlobalTextNodes', ['measure_index', 'nodes'])

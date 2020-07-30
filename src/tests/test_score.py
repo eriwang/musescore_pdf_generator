@@ -8,6 +8,7 @@ _SINGLE_PART_PATH = 'test_resources/single_part.mscz'
 _MULTI_PART_SAME_NAME_PATH = 'test_resources/multi_part_same_name.mscz'
 _MULTI_PART_MULTI_STAVES_PATH = 'test_resources/multi_part_multi_staves.mscz'
 _MULTI_PART_MANUAL_PARTS_PATH = 'test_resources/multi_part_manual_parts.mscz'
+_MULTI_PART_GLOBAL_TEXT_PATH = 'test_resources/multi_part_global_text.mscz'
 
 
 class TestScore(unittest.TestCase):
@@ -16,6 +17,7 @@ class TestScore(unittest.TestCase):
         self._multi_part_same_name_score = Score.create_from_file(_MULTI_PART_SAME_NAME_PATH)
         self._multi_part_multi_staves_score = Score.create_from_file(_MULTI_PART_MULTI_STAVES_PATH)
         self._multi_part_manual_parts_score = Score.create_from_file(_MULTI_PART_MANUAL_PARTS_PATH)
+        self._multi_part_global_text_score = Score.create_from_file(_MULTI_PART_GLOBAL_TEXT_PATH)
 
     def test_split_write_single_part(self):
         _TITLE = 'Single Part'
@@ -66,6 +68,35 @@ class TestScore(unittest.TestCase):
         self._assert_vbox_field_match(piano_root, 'Title', _TITLE)
         self._assert_vbox_field_match(piano_root, 'Instrument Name (Part)', 'Piano')
 
+    def test_split_keep_global_text(self):
+        [violin1, violin2, piano] = self._multi_part_global_text_score.generate_part_scores()
+
+        violin1_root = _write_score_to_string_and_read_xml(violin1)
+        self._assert_staff_id_1_measure_index_has_element_name(violin1_root, 0, 'RehearsalMark')
+        self._assert_staff_id_1_measure_index_has_element_name(violin1_root, 0, 'Tempo')
+        self._assert_staff_id_1_measure_index_has_element_name(violin1_root, 1, 'SystemText')
+        self._assert_staff_id_1_measure_index_has_element_name(violin1_root, 2, 'Tempo')
+        self._assert_staff_id_1_measure_index_has_element_name(violin1_root, 3, 'RehearsalMark')
+
+        violin2_root = _write_score_to_string_and_read_xml(violin2)
+        self._assert_staff_id_1_measure_index_has_element_name(violin2_root, 0, 'RehearsalMark')
+        self._assert_staff_id_1_measure_index_has_element_name(violin2_root, 0, 'Tempo')
+        self._assert_staff_id_1_measure_index_has_element_name(violin2_root, 1, 'SystemText')
+        self._assert_staff_id_1_measure_index_has_element_name(violin2_root, 2, 'Tempo')
+        self._assert_staff_id_1_measure_index_has_element_name(violin2_root, 3, 'RehearsalMark')
+
+        piano_root = _write_score_to_string_and_read_xml(piano)
+        self._assert_staff_id_1_measure_index_has_element_name(piano_root, 0, 'RehearsalMark')
+        self._assert_staff_id_1_measure_index_has_element_name(piano_root, 0, 'Tempo')
+        self._assert_staff_id_1_measure_index_has_element_name(piano_root, 1, 'SystemText')
+        self._assert_staff_id_1_measure_index_has_element_name(piano_root, 2, 'Tempo')
+        self._assert_staff_id_1_measure_index_has_element_name(piano_root, 3, 'RehearsalMark')
+
+        piano_lh_root = find_exactly_one(piano_root, 'Score/Staff/[@id="2"]')
+        self.assertEqual(len(piano_lh_root.findall('Measure/voice/RehearsalMark')), 0)
+        self.assertEqual(len(piano_lh_root.findall('Measure/voice/Tempo')), 0)
+        self.assertEqual(len(piano_lh_root.findall('Measure/voice/SystemText')), 0)
+
     def test_split_multi_part_already_assigned_raises(self):
         with self.assertRaises(ValueError):
             self._multi_part_manual_parts_score.generate_part_scores()
@@ -104,6 +135,13 @@ class TestScore(unittest.TestCase):
 
         self.assertEqual(matching_nodes, 1, 'Did not find a matching node')
 
+    def _assert_staff_id_1_measure_index_has_element_name(self, root, measure_index, element_name):
+        measure_voice_nodes = find_exactly_one(root, 'Score/Staff/[@id="1"]').findall('Measure/voice')
+        self.assertLess(measure_index, len(measure_voice_nodes), 'measure_index is larger than number of measure nodes')
+
+        for i, measure_voice_node in enumerate(measure_voice_nodes):
+            if i == measure_index:
+                self.assertEqual(len(measure_voice_node.findall(element_name)), 1)
 
 def _write_score_to_string_and_read_xml(score):
     return ET.fromstring(score.get_mscx_as_string())

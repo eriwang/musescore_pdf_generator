@@ -38,7 +38,9 @@ class MuseScore:
         # For some reason, CLI MuseScore conversion doesn't apply style files to PDF conversion, but does to mscx (maybe
         # other types too). We get around this weirdness but making an intermediate mscx file that has styles.
         # Worth noting this might just be with the styles I'm working with (MM Rests, Spatium had some odd behavior as
-        # well where it'd just shrink the otes and not adjust staff position).
+        # well where it'd just shrink the notes and not adjust staff position).
+        # TODO: On occasion Windows decides to throw a "[WinError 5] Access is denied" error, I'm not too sure why,
+        #       seeing as it typically runs fine. Maybe there's some process call restrictions?
         style_file_text = MuseScore._create_style_file_text(spatium)
         with scoped_named_temporary_file(content=style_file_text, suffix='.mss') as style_filepath:
             with scoped_named_temporary_file(content='', suffix='.mscx') as mscx_with_styles:
