@@ -43,7 +43,7 @@ def _refresh_listening_file_id_index_and_regen(drive, root):
     return listening_file_ids
 
 
-# TODO: this doesn't take into account if you delete the pdf but don't touch the mscz file
+# TODO: this doesn't take into account if pdfs are missing but the mscz file hasn't changed
 def _generate_pdfs_for_file_id_if_needed(drive, file_id):
     drive_file = drive.get_file_metadata(file_id)
     assert _is_processable_musescore_file(drive_file)
