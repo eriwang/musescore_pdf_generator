@@ -1,4 +1,5 @@
 # Application Files
+config.json
 *.log
 
 # Dev Directories
@@ -7,7 +8,7 @@ venv/
 .idea/
 
 # PyInstaller Output
-*.spec
+hidden-import.spec
 build/
 dist/
 
