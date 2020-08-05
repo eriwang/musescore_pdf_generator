@@ -3,10 +3,8 @@ import tempfile
 import time
 
 from drive.drive import Drive
-from musescore.score import Score
-from musescore.pdf_conversion import convert_to_pdf, convert_to_pdf_optimize_spatium, convert_with_manual_parts_to_pdf
+from musescore.pdf_conversion import convert_mscz_to_pdfs
 from utils.os_path_utils import get_no_extension, get_extension
-
 
 _TEST_FOLDER_ROOT_ID = '11HTp4Y8liv9Oc0Sof0bxvlsGSLmQAvl4'
 
@@ -28,7 +26,7 @@ def run_drive_change_pdf_generator():
                 continue
 
             # You can save an API query by caching the results of the change and using it here, but this makes the code
-            # a (tiny bit) easier to write.
+            # (a tiny bit) easier to write.
             _generate_pdfs_for_file_id_if_needed(d, c.id)
 
         counter += 1
@@ -75,55 +73,11 @@ def _generate_pdfs_for_file_id_if_needed(drive, file_id):
         drive.move_file_to_trash(trash_id)
 
 
-# TODO: extract some of this stuff
 def _convert_opened_drive_file_to_pdf_and_upload(drive, musescore_file, song_name, upload_dir):
-    score = Score.create_from_file(musescore_file)
-    if score.has_manual_parts():
-        return _convert_with_manual_parts_to_pdf_and_upload(drive, score, upload_dir, song_name)
-
-    # I'm choosing not to optimize the spatium here because this is what the user sees in MuseScore. Optimizing
-    # spatium is just for the parts that the users don't see (which is a tad arbitrarily decided, and should
-    # probably be an option).
-    uploaded_file_ids = []
-    uploaded_file_ids.append(_convert_to_pdf_and_upload(
-        drive,
-        score,
-        f'{song_name}.gen.pdf',
-        upload_dir,
-        optimize_spatium=False))
-    if score.get_number_of_parts() == 1:
-        return uploaded_file_ids
-
-    for part in score.generate_part_scores():
-        uploaded_file_ids.append(_convert_to_pdf_and_upload(
-            drive,
-            part,
-            f'{song_name} - {part.name}.gen.pdf',
-            upload_dir,
-            optimize_spatium=True))
-
-    return uploaded_file_ids
-
-
-def _convert_with_manual_parts_to_pdf_and_upload(drive, score, upload_dir, song_name):
-    ids = []
-    with tempfile.TemporaryDirectory() as tempdir:
-        convert_with_manual_parts_to_pdf(score, tempdir, song_name)
-        for gen_file in os.listdir(tempdir):
-            ids.append(drive.upload_or_update_file(os.path.join(tempdir, gen_file), upload_dir))
-    return ids
-
-
-def _convert_to_pdf_and_upload(drive, score, output_filename, upload_dir, optimize_spatium):
-    print(f'converting {output_filename}')
-    with tempfile.TemporaryDirectory() as tempdir:
-        output_filename = os.path.join(tempdir, output_filename)
-        if optimize_spatium:
-            convert_to_pdf_optimize_spatium(score, output_filename)
-        else:
-            convert_to_pdf(score, output_filename)
-
-        return drive.upload_or_update_file(output_filename, upload_dir)
+    with tempfile.TemporaryDirectory as tempdir:
+        convert_mscz_to_pdfs(musescore_file, tempdir, song_name)
+        return [drive.upload_or_update_file(os.path.join(tempdir, gen_file), upload_dir)
+                for gen_file in os.listdir(tempdir)]
 
 
 def _is_processable_musescore_file(drive_file):
