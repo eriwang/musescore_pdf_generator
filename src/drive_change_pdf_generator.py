@@ -72,7 +72,7 @@ def _generate_pdfs_for_file_id_if_needed(drive, file_id):
 
 
 def _convert_opened_drive_file_to_pdf_and_upload(drive, musescore_file, song_name, upload_dir):
-    with tempfile.TemporaryDirectory as tempdir:
+    with tempfile.TemporaryDirectory() as tempdir:
         convert_mscz_to_pdfs(musescore_file, tempdir, song_name)
         return [drive.upload_or_update_file(os.path.join(tempdir, gen_file), upload_dir)
                 for gen_file in os.listdir(tempdir)]
