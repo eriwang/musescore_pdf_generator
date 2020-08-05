@@ -1,28 +1,29 @@
 import json
 import subprocess
 import os
-import platform
 import xml.etree.ElementTree as ET
 
 from utils.os_path_utils import get_extension
 from utils.tempfile_utils import scoped_named_temporary_file
 from utils.xml_utils import create_node_with_text
 
-# TODO: should be default install location, and if user installs it elsewhere they need to tell the app
-_MUSESCORE_BINARY = 'C:/Program Files/MuseScore 3/bin/MuseScore3.exe' if platform.system() == 'Windows' else \
-                    '/mnt/c/Program Files/MuseScore 3/bin/MuseScore3.exe'
-
 
 # https://musescore.org/en/handbook/command-line-options
 class MuseScore:
-    def __init__(self, binary_path=_MUSESCORE_BINARY):
-        if not os.path.isfile(binary_path):
-            raise ValueError(f'Could not find a file at MuseScore binary location: {binary_path}')
+    binary_path = None
 
-        self._binary_path = binary_path
+    @staticmethod
+    def validate_binary():
+        if MuseScore.binary_path is None:
+            raise ValueError('MuseScore binary path never set')
 
-    # TODO: ideally, filename generation is done in one central place (maybe in this class).
-    def convert_mscz_to_pdf_with_manual_parts(self, song_name, mscz_filepath, out_dir):
+        # Ideally, this would sanity test an actual command as well
+        if not os.path.isfile(MuseScore.binary_path):
+            raise RuntimeError(f'Non-existent MuseScore binary path {MuseScore.binary_path}')
+
+    # TODO: ideally, filename generation is done in one central place (maybe even still in this class).
+    @staticmethod
+    def convert_mscz_to_pdf_with_manual_parts(song_name, mscz_filepath, out_dir):
         pdf_path_prefix = os.path.join(out_dir, song_name)
         musescore_job_params = [{
             'in': mscz_filepath,
@@ -30,9 +31,10 @@ class MuseScore:
         }]
 
         with scoped_named_temporary_file(content=json.dumps(musescore_job_params), suffix='.json') as job_json_filepath:
-            subprocess.check_call([self._binary_path, '-j', job_json_filepath])
+            subprocess.check_call([MuseScore.binary_path, '-j', job_json_filepath])
 
-    def convert_to_pdf(self, src_filepath, out_filename, spatium=None):
+    @staticmethod
+    def convert_to_pdf(src_filepath, out_filename, spatium=None):
         if get_extension(out_filename) != '.pdf':
             raise ValueError('Out filename must be of type .pdf')
 
@@ -45,8 +47,9 @@ class MuseScore:
         style_file_text = MuseScore._create_style_file_text(spatium)
         with scoped_named_temporary_file(content=style_file_text, suffix='.mss') as style_filepath:
             with scoped_named_temporary_file(content='', suffix='.mscx') as mscx_with_styles:
-                subprocess.check_call([self._binary_path, src_filepath, '-S', style_filepath, '-o', mscx_with_styles])
-                subprocess.check_call([self._binary_path, mscx_with_styles, '-o', out_filename])
+                subprocess.check_call([MuseScore.binary_path, src_filepath, '-S', style_filepath, '-o',
+                                       mscx_with_styles])
+                subprocess.check_call([MuseScore.binary_path, mscx_with_styles, '-o', out_filename])
 
     @staticmethod
     def _create_style_file_text(spatium):

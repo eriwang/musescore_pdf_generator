@@ -29,12 +29,12 @@ def convert_mscz_to_pdfs(mscz_filename, output_directory, song_name):
 
 def _convert_with_manual_parts_to_pdf(score, out_dir, song_name):
     with scoped_named_temporary_file(content=score.get_mscx_as_string(), suffix='.mscx') as mscx:
-        MuseScore().convert_mscz_to_pdf_with_manual_parts(song_name, mscx, out_dir)
+        MuseScore.convert_mscz_to_pdf_with_manual_parts(song_name, mscx, out_dir)
 
 
 def _convert_to_pdf(score, out_filepath, spatium=None):
     with scoped_named_temporary_file(content=score.get_mscx_as_string(), suffix='.mscx') as mscx:
-        MuseScore().convert_to_pdf(mscx, out_filepath, spatium)
+        MuseScore.convert_to_pdf(mscx, out_filepath, spatium)
 
 
 # TODO: if default spatium and min spatium have same number of pages, can just return right away.

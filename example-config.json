@@ -1,0 +1,4 @@
+{
+    "drive_folder_id": "<ID of Drive Folder, find using Drive APIs>",
+    "musescore_binary": "C:/Program Files/MuseScore 3/bin/MuseScore3.exe"
+}

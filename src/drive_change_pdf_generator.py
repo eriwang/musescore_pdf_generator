@@ -6,17 +6,15 @@ from drive.drive import Drive
 from musescore.pdf_conversion import convert_mscz_to_pdfs
 from utils.os_path_utils import get_no_extension, get_extension
 
-_TEST_FOLDER_ROOT_ID = '11HTp4Y8liv9Oc0Sof0bxvlsGSLmQAvl4'
 
-
-def run_drive_change_pdf_generator():
+def run_drive_change_pdf_generator(drive_root_folder_id):
     d = Drive.create_authenticate_and_start()
 
-    listening_file_ids = _refresh_listening_file_id_index_and_regen(d, _TEST_FOLDER_ROOT_ID)
+    listening_file_ids = _refresh_listening_file_id_index_and_regen(d, drive_root_folder_id)
     counter = 1
     while True:
         if counter % 10 == 0:
-            listening_file_ids = _refresh_listening_file_id_index_and_regen(d, _TEST_FOLDER_ROOT_ID)
+            listening_file_ids = _refresh_listening_file_id_index_and_regen(d, drive_root_folder_id)
 
         for c in d.get_changes():
             if c.id not in listening_file_ids:
