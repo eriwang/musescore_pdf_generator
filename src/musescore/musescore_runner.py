@@ -21,6 +21,7 @@ class MuseScore:
 
         self._binary_path = binary_path
 
+    # TODO: ideally, filename generation is done in one central place (maybe in this class).
     def convert_mscz_to_pdf_with_manual_parts(self, song_name, mscz_filepath, out_dir):
         pdf_path_prefix = os.path.join(out_dir, song_name)
         musescore_job_params = [{

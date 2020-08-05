@@ -9,6 +9,8 @@ def convert_to_pdf(score, out_filepath, spatium=None):
         MuseScore().convert_to_pdf(mscx, out_filepath, spatium)
 
 
+# TODO: if default spatium and min spatium have same number of pages, can just return right away.
+#       Probably do a binary search for optimal spatium
 def convert_to_pdf_optimize_spatium(score, out_filepath):
     _MINIMUM_SPATIUM = 1.5
     _MUSESCORE_DEFAULT_SPATIUM = 1.76389

@@ -75,10 +75,9 @@ def _generate_pdfs_for_file_id_if_needed(drive, file_id):
         drive.move_file_to_trash(trash_id)
 
 
+# TODO: extract some of this stuff
 def _convert_opened_drive_file_to_pdf_and_upload(drive, musescore_file, song_name, upload_dir):
     score = Score.create_from_file(musescore_file)
-    score_output_filename = f'{song_name}.gen.pdf'
-
     if score.has_manual_parts():
         return _convert_with_manual_parts_to_pdf_and_upload(drive, score, upload_dir, song_name)
 
@@ -89,7 +88,7 @@ def _convert_opened_drive_file_to_pdf_and_upload(drive, musescore_file, song_nam
     uploaded_file_ids.append(_convert_to_pdf_and_upload(
         drive,
         score,
-        score_output_filename,
+        f'{song_name}.gen.pdf',
         upload_dir,
         optimize_spatium=False))
     if score.get_number_of_parts() == 1:
